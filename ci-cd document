@@ -1,0 +1,292 @@
+==================jenkins (CI)======================
+
+1) first install the instance (take rhel7.5)  we can give the name as jenkins-master
+
+2) login into jenkins-master   and install the java
+
+	# yum install java-1.8.0-openjdk-devel
+
+if any error will come at the time of installation use below command 
+
+yum-config-manager --enable rhui-REGION-rhel-server-extras rhui-REGION-rhel-server-optional
+
+
+and install the packages  yum install unzip wget git -y
+
+3) enable the epel for jenkins and install the jenkins AND Start , enable the jenkins
+
+# curl --silent --location http://pkg.jenkins-ci.org/redhat-stable/jenkins.repo | sudo tee /etc/yum.repos.d/jenkins.repo
+
+# sudo rpm --import https://jenkins-ci.org/redhat/jenkins-ci.org.key 
+
+# yum install jenkins -y
+
+====
+ these steps are can done in slaves only no need to install docker , and kubectl in master
+
+# systemctl start jenkins && systemctl enable jenkins  
+
+# enable the epel for docker , install the docker and start ,enable the docker
+
+#enable the epel for kubernetes and install the kubectl 
+
+4) go to local git bash and generate key by using below command
+
+	$ ssh-keygen.exe
+
+	$ cat ../../Admin/.ssh/id_rsa.pub  -----keys are saved in this path cop the public key
+
+5) go to cental repo i.e github 
+
+   settings--------->ssh and gpg keys ------->new ssh keys ---> paste th public key
+
+6) open the browser and give the PUBLIC IP 
+
+      13.127.173.117:8080
+
+cat /var/lib/jenkins/secrets/initialAdminPassword   copy the code and give in jenkins url
+
+create the new project at that we can select freestyle
+
+==enable the plugin call github integration==
+
+goto manage jenkins----> manage plugins--->available---> select github integration---> install without restart ---
+
+
+general======
+
+select git hub project and give the github url 
+
+SCM======
+ 
+select git  and give the url ( https)===aplly and save
+
+Build triggers====
+
+enable the GitHub hook trigger for GITScm polling === aplly and save
+
+
+7) go to central github repository 
+
+particular repository === settings==webhooks==name and http://13.127.173.117:8080/github-webhook
+
+8) setting the slave
+
+login into slave and create jenkins user 
+
+# useradd jenkins
+#passwd jenkins
+ passwd
+ newpasswd
+#vi /etc/ssh/sshd-config
+  passwordauthentication yes
+# systemctl resatrt sshd
+
+jenkins as a sudoers user
+
+#visudo
+
+jenkins ALL=(ALL) NOPASSWD=(ALL)
+
+
+
+9) setting the master 
+
+# passwd jenkins
+# vi /etc/ssh/sshd-config
+# systemctl restart sshd
+
+
+# su -s /bin/bash jenkins  ------by using we can login into jenkins
+
+ssh-keygen   ---generate key
+
+cd /var/lib/jenkins/.ssh
+
+ssh-copy-id jenkins@private ip (slave1)
+
+10) go to slave create the directory in /var/lib/jenkins
+
+useradd jenkins -d /var/lib/jenkins  or  
+
+sudo chown -R jenkins.jenkins /var/lib/jenkins
+
+11)    goto jenkins url manage nodes  ====new nodes
+
+      name:slaves
+ no of executors:
+ remote root directory :/var/lib/jenkins
+label: slaves
+  host: slave ip
+
+  and give the slave usename and password
+
+ host key verificato strategy: non verify verification strategy
+
+
+
+
+==========K8( CD )============
+
+1) first install the instance (take rhel7.5)  we can give the name as k8-master
+
+2) disable the selinux
+
+  vi /etc/selinux/config
+
+go to 7th line and edit (permanently diable) SELINUX=disable
+
+use this command without open the file sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+ 
+
+3) enable the EPEL for kubernetes
+
+cat <<EOF > /etc/yum.repos.d/kubernetes.repo
+[kubernetes]
+name=Kubernetes
+baseurl=http://yum.kubernetes.io/repos/kubernetes-el7-x86_64
+enabled=1
+gpgcheck=1
+repo_gpgcheck=1
+gpgkey=https://packages.cloud.google.com/yum/doc/yum-key.gpg
+https://packages.cloud.google.com/yum/doc/rpm-package-key.gpg
+EOF
+
+or use this command wget -O /etc/yum.repos.d/k8.repo https://raw.githubusercontent.com/gangireddydanam/automation1/master/k8/k8.repo
+
+4) yum update -y 
+
+5) install the kubernetes
+
+yum install kubelet kubeadm kubectl kubernetes-cni -y --nogpgcheck
+
+6) start and enable the kubernet
+
+systemctl enable kubelet 
+
+systemctl start kubelet
+
+
+7) stop and disable th firewall 
+( there is no firewalld package in rhel7 no need to disable and stop the firewalld)
+
+systemctl disable firewalld 
+systemctl stop firewalld
+
+8)enable the EPEL for docker 
+
+sed -i 's/enabled=0/enabled=1/g' /etc/yum.repos.d/redhat-rhui.repo
+
+or
+   cd /etc/yum.repos.d/redhat-rhui.repo
+    esc :%s/enabled=0/enabled=1/g
+
+	yum update -y
+
+9) install the docker
+
+yum install docker -y
+systemctl start docker
+systemctl enable docker
+
+10) use below commands to run 
+
+sysctl -w net.bridge.bridge-nf-call-iptables=1 
+
+echo "net.bridge.bridge-nf-call-iptables=1" > /etc/sysctl.d/k8s.conf
+
+11)
+
+
+ take the 0wn ami for master 
+
+and launch 2 slave nodes  and name as k8-slave1  and k8-slave2s
+
+12) restart the server 
+
+run the command
+ kubeadm init        token is generated
+
+kubeadm join 172.31.30.253:6443 --token m5ql0v.yc71ed0h3f1lj58j --discovery-token-ca-cert-hash sha256:79101fe360ea24c38f08f15e2922033c39c8d29b6304dd648fba368dffa90749
+ 
+
+13) 
+
+
+mkdir -p $HOME/.kube
+
+ cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+
+ chown $(id -u):$(id -g) $HOME/.kube/config
+
+
+
+
+
+14) login into slaves and run the token
+
+ kubeadm join 172.31.90.160:6443 --token eivlp5.xe7bbdgvesci0a7s --discovery-token-ca-cert-hash sha256:037deece59738fa3626e2fd32965068414dca81cccbb8061f68da13dc8847fc2
+
+
+install the kubectl package and start the package 
+
+15)Run the beneath command to deploy network in master 
+
+export kubever=$(kubectl version | base64 | tr -d '\n')
+
+kubectl apply -f "https://cloud.weave.works/k8s/net?k8s-version=$kubever" 
+ 
+===== login into each slave  and run the token 
+
+16) login into master and check the nodes and pods
+
+
+kubectl get nodes
+kubectl get pods --all-namespaces
+
+17) create namespaces  name is flask
+
+# kubectl create namespace flask  -------create namespaces
+
+# kubectl get po -n flask   -------open the pods in particular namespace
+
+# kubectl create deployment flask --image=devalrajumahesh/flask:latest -n flask ------ create deployement for particular name space
+
+(or) # kubectl create deployment nginx --image=nginx -n flask
+
+# kubectl get deployments -n flask   -----get deployements for particular namespaces
+
+# kubectl descirbe pods httpd-web-db767b649-v78zg -n flask  ----- describe the particular deployement
+
+# kubectl delete pods coredns-86c58d9df4-k8gn9 -n kube-system  ------delete the pods
+
+# kubectl exec -it coredns-86c58d9df4-k8gn9 bash -n flask   --------login into pod
+
+
+# kubectl apply -f deployment.yml
+
+#kubectl scale --replicas=3 deployemnet /httpd-web -n flask  ---increasde the pods
+
+
+
+
+=====communication between jenkins master and k8 master====
+
+
+1) login into k8 master 
+
+open the /root/.kube/config
+
+
+copy the code
+
+2) open the jenkins master 
+
+su -s /bin/bash jenkins
+
+create a dirctory     mkdir.kube   
+
+
+vi .kube
+
+paste the code whatver in k8
